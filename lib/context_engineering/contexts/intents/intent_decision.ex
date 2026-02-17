@@ -33,8 +33,8 @@ defmodule ContextEngineering.Contexts.Intents.IntentDecision do
 
   def changeset(intent_decision, attrs) do
     intent_decision
-    |> cast(attrs, [:intent_id, :decision, :reason, :risk_score, :policy_snapshot, :cosigned_by, :cosigned_at])
-    |> validate_required([:intent_id, :decision])
+    |> cast(attrs, [:decision, :reason, :risk_score, :policy_snapshot, :cosigned_by, :cosigned_at])
+    |> validate_required([:decision])
     |> validate_inclusion(:decision, ["allow", "deny", "require_cosign", "require_evidence", "delay"])
     |> unique_constraint(:intent_id)
   end

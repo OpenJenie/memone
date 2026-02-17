@@ -13,10 +13,15 @@ defmodule ContextEngineeringWeb.AgentController do
         |> put_status(:created)
         |> json(agent)
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{errors: Knowledge.format_errors(changeset)})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{errors: %{detail: to_string(reason)}})
     end
   end
 

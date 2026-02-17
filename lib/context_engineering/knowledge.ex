@@ -1060,9 +1060,7 @@ defmodule ContextEngineering.Knowledge do
   end
 
   def add_agent_capability(agent_id, attrs) do
-    attrs = Map.put(attrs, "agent_id", agent_id)
-
-    %AgentCapability{}
+    %AgentCapability{agent_id: agent_id}
     |> AgentCapability.changeset(attrs)
     |> Repo.insert()
   end
@@ -1122,7 +1120,7 @@ defmodule ContextEngineering.Knowledge do
   def cosign_intent(intent_id, cosigned_by) do
     with {:ok, intent} <- get_intent(intent_id),
          true <- intent.status == "needs_cosign" do
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
       Repo.transaction(fn ->
         decision = Repo.get_by!(IntentDecision, intent_id: intent.id)
@@ -1184,10 +1182,9 @@ defmodule ContextEngineering.Knowledge do
   end
 
   defp create_intent_decision(intent_id, decision_attrs) do
-    decision_payload = Map.put(decision_attrs, :intent_id, intent_id)
-
     %IntentDecision{}
-    |> IntentDecision.changeset(decision_payload)
+    |> IntentDecision.changeset(decision_attrs)
+    |> Ecto.Changeset.put_change(:intent_id, intent_id)
     |> Repo.insert()
   end
 
@@ -1202,7 +1199,7 @@ defmodule ContextEngineering.Knowledge do
     Enum.reduce_while(capabilities, :ok, fn capability, _acc ->
       case add_agent_capability(agent_id, capability) do
         {:ok, _agent_capability} -> {:cont, :ok}
-        {:error, changeset} -> {:halt, {:error, changeset}}
+        {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end

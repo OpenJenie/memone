@@ -19,8 +19,8 @@ defmodule ContextEngineering.Contexts.Agents.AgentCapability do
 
   def changeset(agent_capability, attrs) do
     agent_capability
-    |> cast(attrs, [:agent_id, :capability, :max_risk_level, :requires_cosign])
-    |> validate_required([:agent_id, :capability])
+    |> cast(attrs, [:capability, :max_risk_level, :requires_cosign])
+    |> validate_required([:capability])
     |> validate_number(:max_risk_level, greater_than_or_equal_to: 0, less_than_or_equal_to: 3)
     |> unique_constraint([:agent_id, :capability])
   end
