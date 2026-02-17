@@ -46,6 +46,30 @@ mix phx.server
 
 Visit http://localhost:4000 to verify the server is running.
 
+
+### Monorepo Layout (Decoupled Apps)
+
+```text
+apps/
+  api/        # Phoenix API slot (current runtime still uses repo-root Phoenix code)
+  mobile/     # Reserved for React Native / iOS app
+  web/        # Reserved for future web app
+packages/
+  contracts/  # Shared API contracts (OpenAPI, DTOs)
+infra/
+  docker/     # API container Dockerfile
+```
+
+### Containerized Local Development
+
+```bash
+# start postgres + phoenix api
+docker compose up
+```
+
+- API: `http://localhost:4000`
+- Postgres: `localhost:5432`
+
 ### Your First Query
 
 ```bash
@@ -556,7 +580,11 @@ MIX_ENV=prod mix phx.server
 
 ### Docker (TODO)
 
-A Dockerfile and docker-compose.yml are planned for easier deployment.
+Monorepo-style app slots and containerization are included:
+- `docker-compose.yml` for API + Postgres local stack
+- `infra/docker/Dockerfile.api` for Phoenix API container
+- `apps/mobile` reserved for future iOS/React Native client
+- `packages/contracts/openapi.yaml` for shared API contracts
 
 ##  Contributing
 
