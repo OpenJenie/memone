@@ -1,0 +1,14 @@
+{
+  "name": "context-engineer-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "docker compose up api",
+    "dev:stack": "docker compose up",
+    "mobile:init": "echo 'Create React Native app in apps/mobile when ready'"
+  }
+}

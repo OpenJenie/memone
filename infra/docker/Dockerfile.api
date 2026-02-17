@@ -1,0 +1,15 @@
+FROM hexpm/elixir:1.18.3-erlang-27.2.1-debian-bookworm-20241223
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
+  git \
+  curl \
+  inotify-tools \
+  postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN mix local.hex --force && mix local.rebar --force
+
+EXPOSE 4000
