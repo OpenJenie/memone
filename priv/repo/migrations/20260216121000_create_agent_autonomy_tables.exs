@@ -1,6 +1,20 @@
 defmodule ContextEngineering.Repo.Migrations.CreateAgentAutonomyTables do
   use Ecto.Migration
 
+  @doc """
+  Create the database schema for agent autonomy, including tables, constraints, and indexes.
+  
+  Creates four tables with their columns, defaults, foreign keys, unique constraints, and indexes:
+  
+  - agents: stores agents with id (binary_id), name, tenant_id, trust_score (default 0.5), status (default "active"), metadata (default %{}), and timestamps. Unique index on (tenant_id, name); indexes on tenant_id and status.
+  
+  - agent_capabilities: stores capabilities per agent with id (binary_id), agent_id (FK -> agents, on_delete: :delete_all), capability, max_risk_level (default 0), requires_cosign (default false), and timestamps. Unique index on (agent_id, capability).
+  
+  - intents: stores agent intents with id (binary_id), agent_id (FK -> agents, on_delete: :restrict), capability, optional resource_type/resource_id, risk_level (default 0), idempotency_key, payload (default %{}), payload_hash, status (default "submitted"), execution_notes, and inserted_at only. Unique index on (agent_id, idempotency_key); indexes on agent_id and status.
+  
+  - intent_decisions: stores decisions for intents with id (binary_id), intent_id (FK -> intents, on_delete: :delete_all), decision, reason, risk_score (default 0.0), policy_snapshot (default %{}), cosigned_by, cosigned_at, and inserted_at only. Unique index on (intent_id); index on decision.
+  """
+  @spec change() :: :ok
   def change do
     create table(:agents, primary_key: false) do
       add :id, :binary_id, primary_key: true

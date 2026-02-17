@@ -30,6 +30,21 @@ defmodule ContextEngineering.Contexts.Agents.Agent do
     timestamps()
   end
 
+  @doc """
+  Builds a changeset for an Agent with casting and validation of allowed fields.
+  
+  Casts only the permitted fields and validates presence of `:name` and `:tenant_id`,
+  ensures `:trust_score` is between 0.0 and 1.0, restricts `:status` to
+  "active", "quarantined", or "revoked", and enforces uniqueness of the
+  `:tenant_id` + `:name` combination.
+  
+  ## Parameters
+  
+    - agent: Agent struct or changeset to apply the changes to.
+    - attrs: Map of attributes to cast (allowed keys: `:name`, `:tenant_id`, `:trust_score`, `:status`, `:metadata`).
+  
+  """
+  @spec changeset(Ecto.Schema.t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(agent, attrs) do
     agent
     |> cast(attrs, [:name, :tenant_id, :trust_score, :status, :metadata])

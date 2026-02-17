@@ -31,6 +31,18 @@ defmodule ContextEngineering.Contexts.Intents.IntentDecision do
     timestamps(updated_at: false)
   end
 
+  @doc """
+  Builds a changeset for an IntentDecision with casting, validations, and constraints.
+  
+  Validates that `:decision` is present and one of: "allow", "deny", "require_cosign", "require_evidence", or "delay". Casts the permitted fields and enforces a unique constraint on `:intent_id`.
+  
+  ## Parameters
+  
+    - intent_decision: an IntentDecision struct or changeset to apply changes to.
+    - attrs: map of attributes to cast (allowed: `:decision`, `:reason`, `:risk_score`, `:policy_snapshot`, `:cosigned_by`, `:cosigned_at`).
+  
+  @spec changeset(struct() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
+  """
   def changeset(intent_decision, attrs) do
     intent_decision
     |> cast(attrs, [:decision, :reason, :risk_score, :policy_snapshot, :cosigned_by, :cosigned_at])

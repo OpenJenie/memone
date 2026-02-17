@@ -1012,12 +1012,37 @@ defmodule ContextEngineering.Knowledge do
 
   # --- Agent Registry ---
 
+  @doc """
+  Creates a new agent record with the given attributes.
+  
+  ## Parameters
+  
+    - attrs: Map of agent attributes used to build the agent changeset.
+  
+  ## Returns
+  
+    - `{:ok, agent}` on successful insertion.
+    - `{:error, changeset}` if validation or insertion fails.
+  """
+  @spec register_agent(map()) :: {:ok, Agent.t()} | {:error, Ecto.Changeset.t()}
   def register_agent(attrs) do
     %Agent{}
     |> Agent.changeset(attrs)
     |> Repo.insert()
   end
 
+  @doc """
+  Creates an agent and associates the given capabilities in a single database transaction.
+  
+  On success returns the created agent with its capabilities preloaded. If any insert fails, the transaction is rolled back and the error is returned.
+  
+  ## Parameters
+  
+    - attrs: map of attributes for the new agent.
+    - capabilities: list of capability attribute maps to attach to the agent.
+  
+  """
+  @spec register_agent_with_capabilities(map(), [map()]) :: {:ok, any()} | {:error, any()}
   def register_agent_with_capabilities(attrs, capabilities) do
     Repo.transaction(fn ->
       with {:ok, agent} <- register_agent(attrs),
@@ -1033,6 +1058,19 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  List agents, optionally filtered by tenant.
+  
+  ## Parameters
+  
+    - params: a map of optional query parameters. Recognized key:
+      - "tenant_id": when provided, only agents with that tenant_id are returned.
+  
+  ## Returns
+  
+  A list of agent structs ordered by insertion time (newest first) with capabilities preloaded.
+  """
+  @spec list_agents(map()) :: list()
   def list_agents(params \\ %{}) do
     tenant_id = Map.get(params, "tenant_id")
 
@@ -1052,6 +1090,10 @@ defmodule ContextEngineering.Knowledge do
     Repo.all(query)
   end
 
+  @doc """
+  Fetches an agent by ID and preloads its capabilities.
+  """
+  @spec get_agent(term()) :: {:ok, Agent.t()} | {:error, :not_found}
   def get_agent(id) do
     case Repo.get(Agent, id) |> Repo.preload(:capabilities) do
       nil -> {:error, :not_found}
@@ -1059,6 +1101,14 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  Creates and inserts a capability record for the given agent.
+  
+  @param attrs: map of attributes for the capability (e.g., `name`, `description`, any capability-specific fields).
+  
+  """
+  @spec add_agent_capability(integer() | String.t(), map()) ::
+          {:ok, AgentCapability.t()} | {:error, Ecto.Changeset.t()}
   def add_agent_capability(agent_id, attrs) do
     %AgentCapability{agent_id: agent_id}
     |> AgentCapability.changeset(attrs)
@@ -1067,6 +1117,23 @@ defmodule ContextEngineering.Knowledge do
 
   # --- Intent Execution ---
 
+  @doc """
+  Evaluate an agent's capability and attributes using the PolicyEngine to produce a policy decision.
+  
+  ## Parameters
+  
+    - attrs: map containing at minimum:
+      - "agent_id": the id of the agent to evaluate.
+      - "capability": the capability name to evaluate for the agent.
+      - "risk_level" (optional): integer or string representing risk; defaults to `0` if absent or invalid.
+  
+  ## Returns
+  
+    - `{:ok, decision}` where `decision` is the PolicyEngine's decision result.
+    - `{:error, reason}` if the agent or capability cannot be retrieved or evaluation fails.
+  
+  """
+  @spec evaluate_intent_policy(map()) :: {:ok, any()} | {:error, any()}
   def evaluate_intent_policy(attrs) do
     with {:ok, agent} <- get_agent(attrs["agent_id"]),
          {:ok, capability} <- get_agent_capability(agent.id, attrs["capability"]) do
@@ -1078,6 +1145,30 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  Creates an intent from the provided attributes, evaluates its decision via the policy engine, and persists the intent together with its associated decision in a single transaction.
+  
+  Parameters
+  
+    - attrs: a map containing intent attributes. Expected keys:
+      - "agent_id": id of the agent submitting the intent.
+      - "capability": name of the capability to evaluate.
+      - "payload": arbitrary map to be executed (optional; defaults to %{}).
+      - "risk_level": integer or string; will be normalized (optional).
+  
+  Behavior
+  
+    - Computes a SHA-256 hex `payload_hash` from the JSON-encoded payload.
+    - Normalizes `risk_level` and injects it into attrs before evaluation.
+    - Calls the PolicyEngine to obtain a decision and derives an intent status from that decision.
+    - Inserts the Intent and its IntentDecision inside a database transaction and returns the persisted intent preloaded with its :agent and :decision on success.
+  
+  Returns
+  
+    - `{:ok, intent}` on success where `intent` is the persisted intent struct preloaded with `:agent` and `:decision`.
+    - `{:error, reason}` if agent lookup, capability check, policy evaluation persistence, or the transaction fails.
+  """
+  @spec submit_intent(map()) :: {:ok, any()} | {:error, any()}
   def submit_intent(attrs) do
     with {:ok, agent} <- get_agent(attrs["agent_id"]),
          {:ok, capability} <- get_agent_capability(agent.id, attrs["capability"]) do
@@ -1110,6 +1201,19 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  Fetches an intent by its id and preloads its associated agent and decision.
+  
+  ## Parameters
+  
+    - id: Primary key of the intent to retrieve.
+  
+  ## Returns
+  
+    - `{:ok, intent}` with `:agent` and `:decision` preloaded if the intent exists.
+    - `{:error, :not_found}` if no intent matches the given id.
+  """
+  @spec get_intent(any()) :: {:ok, Intent.t()} | {:error, :not_found()}
   def get_intent(id) do
     case Repo.get(Intent, id) |> Repo.preload([:agent, :decision]) do
       nil -> {:error, :not_found}
@@ -1117,6 +1221,23 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  Marks an existing intent as cosigned and transitions it to executed status.
+  
+  Attempts to load the intent by id, verifies the intent's status is "needs_cosign", updates the associated intent decision to record the cosign action (setting `cosigned_by`, `cosigned_at`, decision `"allow"`, and reason `"cosigned"`), and updates the intent's status to `"executed"` with execution notes.
+  
+  ## Parameters
+  
+    - intent_id: Identifier of the intent to cosign.
+    - cosigned_by: Identifier (typically a username or agent id) of who cosigned the intent.
+  
+  ## Returns
+  
+    - `{:ok, intent}` with the updated intent preloaded with `:agent` and `:decision` on success.
+    - `{:error, :invalid_status}` if the intent is not in the "needs_cosign" status.
+    - `{:error, reason}` for other failures (e.g., database changeset errors).
+  """
+  @spec cosign_intent(term(), String.t()) :: {:ok, any()} | {:error, any()}
   def cosign_intent(intent_id, cosigned_by) do
     with {:ok, intent} <- get_intent(intent_id),
          true <- intent.status == "needs_cosign" do
@@ -1153,6 +1274,13 @@ defmodule ContextEngineering.Knowledge do
     end
   end
 
+  @doc """
+  Marks an intent as rolled_back and appends the provided rollback reason to its execution notes.
+  
+  If the intent has existing execution notes, the reason is appended separated by "; ". If the intent's status is not one of "executed", "needs_evidence", or "needs_cosign", the function returns `{:error, :invalid_status}`. Returns the updated intent preloaded with its agent and decision on success.
+  """
+  @spec rollback_intent(integer | String.t(), String.t()) ::
+          {:ok, Intent.t()} | {:error, :invalid_status | :not_found | Ecto.Changeset.t()}
   def rollback_intent(intent_id, reason) do
     with {:ok, intent} <- get_intent(intent_id),
          true <- intent.status in ["executed", "needs_evidence", "needs_cosign"] do
@@ -1223,6 +1351,12 @@ defmodule ContextEngineering.Knowledge do
 
   # --- Error Formatting ---
 
+  @doc """
+  Formats and interpolates validation errors from an Ecto.Changeset into a map.
+  
+  Returns a map where each field maps to a list of error messages with `%{}` placeholders replaced by their values (e.g., `%{count}`).
+  """
+  @spec format_errors(Ecto.Changeset.t()) :: %{optional(atom()) => [String.t()]}
   def format_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
       Enum.reduce(opts, msg, fn {key, value}, acc ->

@@ -1,7 +1,30 @@
 defmodule ContextEngineering.Policies.PolicyEngine do
-  @moduledoc """
-  Minimal policy decision engine for agent-delegated intent execution.
+  @doc """
+  Decides whether an agent may execute a capability based on risk level, capability constraints, and agent trust.
+  
+  Evaluates the provided `attrs` for a "risk_level" (defaults to 0) and applies policy rules in order:
+  - deny if the agent is not active;
+  - deny if the capability is not provided;
+  - deny if the risk level exceeds the capability's `max_risk_level`;
+  - require cosign if the capability requires cosign or the risk level is 3 or higher;
+  - require evidence if the agent's `trust_score` is less than 0.3 and the risk level is 2 or higher;
+  - allow otherwise.
+  
+  Parameters
+  
+    - agent: Map representing the agent (expects keys like `:status` and `:trust_score`).
+    - capability: Map or `nil`. When present, expected keys include `:max_risk_level` and `:requires_cosign`.
+    - attrs: Map of attributes; the `"risk_level"` key is used and defaults to 0 when absent.
+  
+  Returns
+  
+    - A map containing:
+      - `:decision` - decision string (`"deny"`, `"require_cosign"`, `"require_evidence"`, or `"allow"`).
+      - `:reason` - short reason code for the decision.
+      - `:risk_score` - numeric risk score computed from the evaluated risk level.
+      - `:policy_snapshot` - map with evaluated policy details (`max_risk_level`, `requires_cosign`, and `evaluated_risk_level`).
   """
+  @spec evaluate(map(), map() | nil, map()) :: map()
 
   def evaluate(agent, capability, attrs) do
     risk_level = Map.get(attrs, "risk_level", 0)
