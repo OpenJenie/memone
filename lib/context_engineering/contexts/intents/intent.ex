@@ -41,6 +41,22 @@ defmodule ContextEngineering.Contexts.Intents.Intent do
     timestamps(updated_at: false)
   end
 
+  @doc """
+  Builds a changeset for an Intent, casting allowed attributes and enforcing validations and constraints.
+  
+  Validations:
+    - Requires: `agent_id`, `capability`, `risk_level`, `idempotency_key`, `payload_hash`.
+    - Ensures `risk_level` is between 0 and 3 (inclusive).
+    - Ensures `status` is one of: "submitted", "executed", "denied", "needs_cosign", "needs_evidence", "rolled_back".
+    - Enforces a unique constraint on the combination of `:agent_id` and `:idempotency_key`.
+  
+  ## Parameters
+  
+    - intent: The Intent struct or changeset to cast into.
+    - attrs: Map of attributes to cast and validate.
+  
+  """
+  @spec changeset(struct(), map()) :: Ecto.Changeset.t()
   def changeset(intent, attrs) do
     intent
     |> cast(attrs, [

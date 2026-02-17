@@ -17,6 +17,17 @@ defmodule ContextEngineering.Contexts.Agents.AgentCapability do
     timestamps()
   end
 
+  @doc """
+  Builds a changeset for an AgentCapability from the given attributes.
+  
+  Validates that `:capability` is present, ensures `:max_risk_level` is between 0 and 3 (inclusive), and enforces a unique constraint on the combination of `:agent_id` and `:capability`.
+  
+  ## Parameters
+  
+    - agent_capability: an AgentCapability struct or existing changeset.
+    - attrs: map of attributes. Accepted keys: `:capability`, `:max_risk_level`, `:requires_cosign`
+  """
+  @spec changeset(struct(), map()) :: Ecto.Changeset.t()
   def changeset(agent_capability, attrs) do
     agent_capability
     |> cast(attrs, [:capability, :max_risk_level, :requires_cosign])
