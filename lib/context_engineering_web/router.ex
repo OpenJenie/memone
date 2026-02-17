@@ -60,6 +60,19 @@ defmodule ContextEngineeringWeb.Router do
     get("/debate/by-resource", DebateController, :by_resource)
     get("/debate/:id", DebateController, :show)
     post("/debate/:id/judge", DebateController, :judge)
+
+    # Agent-delegated autonomy
+    post("/agents/register", AgentController, :create)
+    get("/agents", AgentController, :index)
+    get("/agents/:id", AgentController, :show)
+    get("/agents/:id/trust", AgentController, :trust)
+
+    post("/intents", IntentController, :create)
+    get("/intents/:id", IntentController, :show)
+    post("/intents/:id/cosign", IntentController, :cosign)
+    post("/intents/:id/rollback", IntentController, :rollback)
+
+    post("/policies/evaluate", PolicyController, :evaluate)
   end
 
   # Browser routes for graph visualization
