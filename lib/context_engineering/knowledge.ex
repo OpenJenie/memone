@@ -73,8 +73,13 @@ defmodule ContextEngineering.Knowledge do
   alias ContextEngineering.Contexts.Debates.Debate
   alias ContextEngineering.Contexts.Debates.DebateMessage
   alias ContextEngineering.Contexts.Debates.DebateJudgment
+  alias ContextEngineering.Contexts.Agents.Agent
+  alias ContextEngineering.Contexts.Agents.AgentCapability
+  alias ContextEngineering.Contexts.Intents.Intent
+  alias ContextEngineering.Contexts.Intents.IntentDecision
   alias ContextEngineering.Services.EmbeddingService
   alias ContextEngineering.Contexts.Relationships.Graph
+  alias ContextEngineering.Policies.PolicyEngine
 
   # --- ADR ---
 
@@ -1004,6 +1009,217 @@ defmodule ContextEngineering.Knowledge do
   defp get_resource(id, "meeting"), do: Repo.get(Meeting, id)
   defp get_resource(id, "snapshot"), do: Repo.get(Snapshot, id)
   defp get_resource(_id, _type), do: nil
+
+  # --- Agent Registry ---
+
+  def register_agent(attrs) do
+    %Agent{}
+    |> Agent.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def register_agent_with_capabilities(attrs, capabilities) do
+    Repo.transaction(fn ->
+      with {:ok, agent} <- register_agent(attrs),
+           :ok <- insert_capabilities(agent.id, capabilities) do
+        Repo.preload(agent, :capabilities)
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, agent} -> {:ok, agent}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def list_agents(params \\ %{}) do
+    tenant_id = Map.get(params, "tenant_id")
+
+    query =
+      from(a in Agent,
+        order_by: [desc: a.inserted_at],
+        preload: [:capabilities]
+      )
+
+    query =
+      if tenant_id do
+        from(a in query, where: a.tenant_id == ^tenant_id)
+      else
+        query
+      end
+
+    Repo.all(query)
+  end
+
+  def get_agent(id) do
+    case Repo.get(Agent, id) |> Repo.preload(:capabilities) do
+      nil -> {:error, :not_found}
+      agent -> {:ok, agent}
+    end
+  end
+
+  def add_agent_capability(agent_id, attrs) do
+    %AgentCapability{agent_id: agent_id}
+    |> AgentCapability.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  # --- Intent Execution ---
+
+  def evaluate_intent_policy(attrs) do
+    with {:ok, agent} <- get_agent(attrs["agent_id"]),
+         {:ok, capability} <- get_agent_capability(agent.id, attrs["capability"]) do
+      risk_level = normalize_risk_level(Map.get(attrs, "risk_level", 0))
+      attrs = Map.put(attrs, "risk_level", risk_level)
+      decision = PolicyEngine.evaluate(agent, capability, attrs)
+
+      {:ok, decision}
+    end
+  end
+
+  def submit_intent(attrs) do
+    with {:ok, agent} <- get_agent(attrs["agent_id"]),
+         {:ok, capability} <- get_agent_capability(agent.id, attrs["capability"]) do
+      payload = Map.get(attrs, "payload", %{})
+      payload_hash = :crypto.hash(:sha256, Jason.encode!(payload)) |> Base.encode16(case: :lower)
+
+      risk_level = normalize_risk_level(Map.get(attrs, "risk_level", 0))
+      attrs = Map.put(attrs, "risk_level", risk_level)
+
+      decision = PolicyEngine.evaluate(agent, capability, attrs)
+
+      intent_attrs =
+        attrs
+        |> Map.put("payload", payload)
+        |> Map.put("payload_hash", payload_hash)
+        |> Map.put("status", intent_status(decision.decision))
+
+      Repo.transaction(fn ->
+        with {:ok, intent} <- create_intent(intent_attrs),
+             {:ok, _decision} <- create_intent_decision(intent.id, decision) do
+          Repo.preload(intent, [:agent, :decision])
+        else
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+      |> case do
+        {:ok, intent} -> {:ok, intent}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  def get_intent(id) do
+    case Repo.get(Intent, id) |> Repo.preload([:agent, :decision]) do
+      nil -> {:error, :not_found}
+      intent -> {:ok, intent}
+    end
+  end
+
+  def cosign_intent(intent_id, cosigned_by) do
+    with {:ok, intent} <- get_intent(intent_id),
+         true <- intent.status == "needs_cosign" do
+      now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+      Repo.transaction(fn ->
+        decision = Repo.get_by!(IntentDecision, intent_id: intent.id)
+
+        with {:ok, _updated_decision} <-
+               decision
+               |> IntentDecision.changeset(%{
+                 cosigned_by: cosigned_by,
+                 cosigned_at: now,
+                 decision: "allow",
+                 reason: "cosigned"
+               })
+               |> Repo.update(),
+             {:ok, updated_intent} <-
+               intent
+               |> Intent.changeset(%{status: "executed", execution_notes: "Cosigned by #{cosigned_by}"})
+               |> Repo.update() do
+          Repo.preload(updated_intent, [:agent, :decision])
+        else
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+      |> case do
+        {:ok, updated_intent} -> {:ok, updated_intent}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      false -> {:error, :invalid_status}
+      error -> error
+    end
+  end
+
+  def rollback_intent(intent_id, reason) do
+    with {:ok, intent} <- get_intent(intent_id),
+         true <- intent.status in ["executed", "needs_evidence", "needs_cosign"] do
+      notes =
+        case intent.execution_notes do
+          nil -> "Rolled back: #{reason}"
+          existing -> "#{existing}; Rolled back: #{reason}"
+        end
+
+      intent
+      |> Intent.changeset(%{status: "rolled_back", execution_notes: notes})
+      |> Repo.update()
+      |> case do
+        {:ok, updated_intent} -> {:ok, Repo.preload(updated_intent, [:agent, :decision])}
+        {:error, changeset} -> {:error, changeset}
+      end
+    else
+      false -> {:error, :invalid_status}
+      error -> error
+    end
+  end
+
+  defp create_intent(attrs) do
+    %Intent{}
+    |> Intent.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  defp create_intent_decision(intent_id, decision_attrs) do
+    %IntentDecision{}
+    |> IntentDecision.changeset(decision_attrs)
+    |> Ecto.Changeset.put_change(:intent_id, intent_id)
+    |> Repo.insert()
+  end
+
+  defp get_agent_capability(agent_id, capability_name) do
+    case Repo.get_by(AgentCapability, agent_id: agent_id, capability: capability_name) do
+      nil -> {:error, :capability_not_allowed}
+      capability -> {:ok, capability}
+    end
+  end
+
+  defp insert_capabilities(agent_id, capabilities) do
+    Enum.reduce_while(capabilities, :ok, fn capability, _acc ->
+      case add_agent_capability(agent_id, capability) do
+        {:ok, _agent_capability} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp intent_status("allow"), do: "executed"
+  defp intent_status("deny"), do: "denied"
+  defp intent_status("require_cosign"), do: "needs_cosign"
+  defp intent_status("require_evidence"), do: "needs_evidence"
+  defp intent_status("delay"), do: "submitted"
+
+  defp normalize_risk_level(risk_level) when is_integer(risk_level), do: risk_level
+
+  defp normalize_risk_level(risk_level) when is_binary(risk_level) do
+    case Integer.parse(risk_level) do
+      {value, ""} -> value
+      _ -> 0
+    end
+  end
+
+  defp normalize_risk_level(_), do: 0
 
   # --- Error Formatting ---
 

@@ -17,6 +17,7 @@ Complete API documentation for the Context Engineering System.
 - [Failures](#failures-incident-reports)
 - [Meetings](#meetings-decisions)
 - [Graph Queries](#graph-queries)
+- [Agent Autonomy](#agent-autonomy)
 - [Error Handling](#error-handling)
 - [Rate Limiting](#rate-limiting)
 
@@ -710,6 +711,82 @@ GET /api/graph/related/:id?type=adr&depth=2
 
 ---
 
+## Agent Autonomy
+
+### Register Agent
+
+```http
+POST /api/agents/register
+```
+
+**Request Body:**
+```json
+{
+  "name": "planner-agent",
+  "tenant_id": "tenant-a",
+  "capabilities": [
+    {"capability": "update_adr", "max_risk_level": 2},
+    {"capability": "archive_record", "max_risk_level": 3, "requires_cosign": true}
+  ]
+}
+```
+
+### Submit Intent
+
+```http
+POST /api/intents
+```
+
+**Request Body:**
+```json
+{
+  "agent_id": "<agent-id>",
+  "capability": "update_adr",
+  "resource_type": "adr",
+  "resource_id": "ADR-001",
+  "risk_level": 2,
+  "idempotency_key": "0f88687c-a8b6-4f2b-8f55-0de6f53f8df1",
+  "payload": {"status": "accepted"}
+}
+```
+
+### Evaluate Policy Without Persisting Intent
+
+```http
+POST /api/policies/evaluate
+```
+
+**Response Example:**
+```json
+{
+  "decision": "require_cosign",
+  "reason": "high_risk_requires_cosign",
+  "risk_score": 1.0,
+  "policy_snapshot": {
+    "max_risk_level": 3,
+    "requires_cosign": true,
+    "evaluated_risk_level": 3
+  }
+}
+```
+
+### Roll Back Intent
+
+```http
+POST /api/intents/:id/rollback
+```
+
+**Request Body (optional):**
+```json
+{
+  "reason": "Unexpected side effect"
+}
+```
+
+Rollback transitions an intent to `rolled_back` and appends audit text to `execution_notes`.
+
+---
+
 ## Error Handling
 
 ### Error Response Format
@@ -851,4 +928,4 @@ curl "http://localhost:4000/api/graph/related/ADR-004?type=adr&depth=2"
 
 **API Version:** 1.0.0
 
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-16
