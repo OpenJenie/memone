@@ -14,8 +14,8 @@ defmodule ContextEngineering.MixProject do
 
       # Docs
       name: "Context Engineering",
-      source_url: "https://github.com/standard-librarian/context-engineer",
-      homepage_url: "https://github.com/standard-librarian/context-engineer",
+      source_url: "https://github.com/OpenJenie/memone",
+      homepage_url: "https://github.com/OpenJenie/memone",
       docs: [
         main: "readme",
         extras: [

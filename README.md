@@ -31,8 +31,8 @@ When working on a team, important context is scattered everywhere:
 
 ```bash
 # Clone the repository
-git clone https://github.com/standard-librarian/context-engineer.git
-cd context-engineer/context_engineering
+git clone https://github.com/OpenJenie/memone.git
+cd memone
 
 # Install dependencies
 mix deps.get
@@ -369,7 +369,9 @@ curl http://localhost:4000/api/graph/related/ADR-001?depth=2
 
 ### For Cursor / GitHub Copilot
 
-See the example Go application in the [`examples/go-echo-app`](https://github.com/standard-librarian/context-engineer/tree/main/examples/go-echo-app) directory.
+See the example Go application in the
+[`examples/go-echo-app`](https://github.com/OpenJenie/memone/tree/main/examples/go-echo-app)
+directory.
 
 The example shows:
 1. Skills that query Context Engineering
