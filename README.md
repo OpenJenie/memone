@@ -159,15 +159,14 @@ Content-Type: application/json
 {
   "query": "Why did we choose PostgreSQL?",
   "max_tokens": 4000,
-  "types": ["adr", "failure"]
+  "domains": ["adr", "failure"]
 }
 ```
 
 Response:
 ```json
 {
-  "query": "Why did we choose PostgreSQL?",
-  "items": [
+  "key_decisions": [
     {
       "id": "ADR-001",
       "type": "adr",
@@ -178,11 +177,9 @@ Response:
       "created_date": "2024-01-15"
     }
   ],
-  "metadata": {
-    "total_items": 3,
-    "tokens_used": 1200,
-    "max_tokens": 4000
-  }
+  "known_issues": [],
+  "recent_changes": [],
+  "total_items": 1
 }
 ```
 

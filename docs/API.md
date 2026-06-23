@@ -102,15 +102,19 @@ GET /api/context/recent?limit=10
 
 **Response:**
 ```json
-[
-  {
-    "id": "ADR-004",
-    "type": "adr",
-    "title": "Add Redis Caching",
-    "created_at": "2026-02-12T10:30:00Z",
-    "tags": ["cache", "redis"]
-  }
-]
+{
+  "adrs": [
+    {
+      "id": "ADR-004",
+      "type": "adr",
+      "title": "Add Redis Caching",
+      "created_at": "2026-02-12T10:30:00Z",
+      "tags": ["cache", "redis"]
+    }
+  ],
+  "failures": [],
+  "meetings": []
+}
 ```
 
 ---
@@ -129,22 +133,25 @@ GET /api/context/timeline?from=2026-01-01&to=2026-02-13
 
 **Response:**
 ```json
-[
-  {
-    "id": "ADR-004",
-    "type": "adr",
-    "title": "Add Redis Caching",
-    "created_date": "2026-02-10",
-    "tags": ["cache"]
-  },
-  {
-    "id": "FAIL-043",
-    "type": "failure",
-    "title": "Cache Miss Storm",
-    "incident_date": "2026-02-11",
-    "severity": "medium"
-  }
-]
+{
+  "items": [
+    {
+      "id": "ADR-004",
+      "type": "adr",
+      "title": "Add Redis Caching",
+      "created_date": "2026-02-10",
+      "tags": ["cache"]
+    },
+    {
+      "id": "FAIL-043",
+      "type": "failure",
+      "title": "Cache Miss Storm",
+      "incident_date": "2026-02-11",
+      "severity": "medium"
+    }
+  ],
+  "count": 2
+}
 ```
 
 ---
@@ -169,21 +176,22 @@ GET /api/context/domain/database
 ```json
 {
   "domain": "database",
-  "items": [
+  "adrs": [
     {
       "id": "ADR-001",
       "type": "adr",
       "title": "Choose PostgreSQL",
       "tags": ["database", "postgresql"]
-    },
+    }
+  ],
+  "failures": [
     {
       "id": "FAIL-042",
       "type": "failure",
       "title": "Connection Pool Exhaustion",
       "tags": ["database", "performance"]
     }
-  ],
-  "count": 2
+  ]
 }
 ```
 
@@ -296,34 +304,31 @@ GET /api/adr/:id
 **Response:**
 ```json
 {
-  "id": "ADR-001",
-  "title": "Choose PostgreSQL over MongoDB",
-  "decision": "Use PostgreSQL as primary database",
-  "context": "Need ACID compliance...",
-  "options_considered": {...},
-  "outcome": "Successfully implemented...",
-  "status": "active",
-  "created_date": "2025-06-15",
-  "supersedes": [],
-  "superseded_by": null,
-  "tags": ["database", "postgresql"],
-  "author": "jane@company.com",
-  "stakeholders": ["engineering"],
-  "access_count_30d": 45,
-  "created_at": "2025-06-15T10:00:00Z",
-  "updated_at": "2025-12-01T14:30:00Z",
+  "adr": {
+    "id": "ADR-001",
+    "title": "Choose PostgreSQL over MongoDB",
+    "decision": "Use PostgreSQL as primary database",
+    "context": "Need ACID compliance...",
+    "options_considered": {...},
+    "outcome": "Successfully implemented...",
+    "status": "active",
+    "created_date": "2025-06-15",
+    "tags": ["database", "postgresql"],
+    "author": "jane@company.com",
+    "stakeholders": ["engineering"],
+    "access_count_30d": 45,
+    "reference_count": 12,
+    "inserted_at": "2025-06-15T10:00:00Z",
+    "updated_at": "2025-12-01T14:30:00Z"
+  },
   "related_items": [
     {
       "id": "FAIL-042",
       "type": "failure",
       "relationship": "caused_by"
-    },
-    {
-      "id": "MEET-003",
-      "type": "meeting",
-      "relationship": "discussed_in"
     }
-  ]
+  ],
+  "debate": null
 }
 ```
 
@@ -460,34 +465,34 @@ GET /api/failure/:id
 **Response:**
 ```json
 {
-  "id": "FAIL-042",
-  "title": "Database Connection Pool Exhaustion",
-  "incident_date": "2025-11-03",
-  "severity": "high",
-  "root_cause": "Pool size insufficient for peak load",
-  "symptoms": "API timeouts, 500 errors",
-  "impact": "15% users affected for 2 hours",
-  "resolution": "Increased pool to 200, added monitoring",
-  "prevention": [
-    "Added pool metrics",
-    "Set up alerts",
-    "Updated load tests"
-  ],
-  "status": "resolved",
-  "pattern": "resource_exhaustion",
-  "tags": ["database", "performance"],
-  "lessons_learned": "Always monitor resource utilization",
-  "author": "oncall@company.com",
-  "access_count_30d": 23,
-  "created_at": "2025-11-03T14:00:00Z",
-  "updated_at": "2025-11-04T10:00:00Z",
+  "failure": {
+    "id": "FAIL-042",
+    "title": "Database Connection Pool Exhaustion",
+    "incident_date": "2025-11-03",
+    "severity": "high",
+    "root_cause": "Pool size insufficient for peak load",
+    "symptoms": "API timeouts, 500 errors",
+    "impact": "15% users affected for 2 hours",
+    "resolution": "Increased pool to 200, added monitoring",
+    "prevention": [...],
+    "status": "resolved",
+    "pattern": "resource_exhaustion",
+    "tags": ["database", "performance"],
+    "lessons_learned": "Always monitor resource utilization",
+    "author": "oncall@company.com",
+    "access_count_30d": 23,
+    "reference_count": 5,
+    "inserted_at": "2025-11-03T14:00:00Z",
+    "updated_at": "2025-11-04T10:00:00Z"
+  },
   "related_items": [
     {
       "id": "ADR-001",
       "type": "adr",
       "relationship": "caused_by"
     }
-  ]
+  ],
+  "debate": null
 }
 ```
 
@@ -616,14 +621,19 @@ GET /api/meeting/:id
 **Response:**
 ```json
 {
-  "id": "MEET-003",
-  "meeting_title": "Q4 2025 Architecture Review",
-  "date": "2025-10-15",
-  "decisions": [...],
-  "attendees": ["alice@company.com", "bob@company.com"],
-  "tags": ["architecture"],
-  "status": "active",
-  "created_at": "2025-10-15T14:00:00Z"
+  "meeting": {
+    "id": "MEET-003",
+    "meeting_title": "Q4 2025 Architecture Review",
+    "date": "2025-10-15",
+    "decisions": [...],
+    "attendees": ["alice@company.com", "bob@company.com"],
+    "tags": ["architecture"],
+    "status": "active",
+    "access_count_30d": 15,
+    "inserted_at": "2025-10-15T14:00:00Z",
+    "updated_at": "2025-10-15T14:00:00Z"
+  },
+  "debate": null
 }
 ```
 
@@ -677,11 +687,7 @@ GET /api/graph/related/:id?type=adr&depth=2
 **Response:**
 ```json
 {
-  "item": {
-    "id": "ADR-001",
-    "type": "adr",
-    "title": "Choose PostgreSQL"
-  },
+  "item_id": "ADR-001",
   "related": [
     {
       "id": "FAIL-042",
@@ -696,16 +702,8 @@ GET /api/graph/related/:id?type=adr&depth=2
       "title": "Architecture Review",
       "relationship": "discussed_in",
       "depth": 1
-    },
-    {
-      "id": "ADR-002",
-      "type": "adr",
-      "title": "Add Connection Pooling",
-      "relationship": "related_to",
-      "depth": 2
     }
-  ],
-  "total_related": 3
+  ]
 }
 ```
 
